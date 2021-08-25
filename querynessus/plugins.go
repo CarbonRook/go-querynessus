@@ -28,13 +28,13 @@ type PluginAttributes struct {
 	IntelType                    string                      `json:"intel_type"`
 	PluginPublicationDate        string                      `json:"plugin_publication_date"`
 	VulnerabilityPublicationDate string                      `json:"vuln_publication_date,omitempty"`
-	Version                      string                      `json:"plugin_version,omitempty"`
+	Version                      float32                     `json:"-"`
 	PluginType                   string                      `json:"plugin_type,omitempty"`
 	Description                  string                      `json:"description"`
 	RiskFactor                   string                      `json:"risk_factor"`
 	ExploitedByNessus            bool                        `json:"exploited_by_nessus,omitempty"`
 	CVE                          []string                    `json:"cve"`
-	DefaultAccount               string                      `json:"default_account,omitempty"`
+	DefaultAccount               bool                        `json:"default_account,omitempty"`
 	Solution                     string                      `json:"solution"`
 	CPE                          []string                    `json:"cpe,omitempty"`
 	InTheNews                    bool                        `json:"in_the_news,omitempty"`
@@ -43,6 +43,9 @@ type PluginAttributes struct {
 	AlwaysRun                    bool                        `json:"always_run"`
 	Compliance                   bool                        `json:"compliance"`
 	BID                          []int                       `json:"bid"`
+	STIGSeverity                 string                      `json:"stig_severity,omitempty"`
+	Agent                        string                      `json:"agent,omitempty"`
+	PotentialVulnerability       bool                        `json:"potential_vulnerability,omitempty"`
 
 	CVSSv2BaseScore     float32 `json:"cvss_base_score,omitempty"`
 	CVSSv2TemporalScore float32 `json:"cvss_temporal_score,omitempty"`
@@ -82,12 +85,13 @@ type PluginAttributes struct {
 		ReportConfidence    string `json:"ReportConfidence"`
 	} `json:"cvss3_temporal_vector,omitempty"`
 
-	ExploitAvailable           bool `json:"exploit_available"`
-	ExploitFrameworkCanvas     bool `json:"exploit_framework_canvas,omitempty"`
-	ExploitFrameworkCore       bool `json:"exploit_framework_core,omitempty"`
-	ExploitFrameworkD2Elliot   bool `json:"exploit_framework_d2_elliot,omitempty"`
-	ExploitFrameworkExploitHub bool `json:"exploit_framework_exploithub,omitempty"`
-	ExploitFrameworkMetasploit bool `json:"exploit_framework_metasploit,omitempty"`
+	ExploitAvailable           bool   `json:"exploit_available"`
+	ExploitFrameworkCanvas     bool   `json:"exploit_framework_canvas,omitempty"`
+	ExploitFrameworkCore       bool   `json:"exploit_framework_core,omitempty"`
+	ExploitFrameworkD2Elliot   bool   `json:"exploit_framework_d2_elliot,omitempty"`
+	ExploitFrameworkExploitHub bool   `json:"exploit_framework_exploithub,omitempty"`
+	ExploitFrameworkMetasploit bool   `json:"exploit_framework_metasploit,omitempty"`
+	ExploitabilityEase         string `json:"exploitability_ease,omitempty"`
 
 	ExploitedByMalware bool `json:"exploited_by_malware,omitempty"`
 	Malware            bool `json:"malware,omitempty"`
@@ -114,14 +118,14 @@ type VPRDrivers struct {
 	AgeOfVulnerability struct {
 		LowerBound int `json:"lower_bound,omitempty"`
 		UpperBound int `json:"upper_bound,omitempty"`
-	} `json:"age_of_vulnerability"`
+	} `json:"age_of_vuln"`
 	ExploitCodeMaturity        string `json:"exploit_code_maturity"`
 	ThreatIntensityLast28      string `json:"threat_intensity_last28"`
 	IsCVSSImpactScorePredicted bool   `json:"cvss_impact_score_predicted,omitempty"`
 	ThreatRecency              struct {
 		LowerBound int `json:"lower_bound,omitempty"`
 		UpperBound int `json:"upper_bound,omitempty"`
-	} `json:"threat_recency"`
+	} `json:"threat_recency,omitempty"`
 	ThreatSourcesLast28 []string `json:"threat_sources_last28"`
 	ProductCoverage     string   `json:"product_coverage"`
 }

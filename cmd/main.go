@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"go-querynessus/querynessus"
 	"log"
 	"os"
@@ -13,16 +12,25 @@ func main() {
 		SecretKey: os.Getenv("TENABLE_SECRET_KEY"),
 	}
 
-	params := querynessus.RequestParams{}
+	params := querynessus.RequestParams{
+		Size: 10000,
+		Page: 1,
+	}
 
-	results, err := querynessus.FetchPlugins(creds, &params)
+	results, err := querynessus.FetchAllPlugins(creds, &params)
 
 	if err != nil {
 		log.Println("Failed to fetch plugins")
 		os.Exit(1)
 	}
 
-	for _, nessusPlugin := range results {
-		fmt.Println(nessusPlugin.Name)
+	combinedPage := querynessus.PluginListPage{
+		TotalCount: len(results),
+		Data: querynessus.PluginDetailsList{
+			PluginDetails: results,
+		},
+		Size: len(results),
 	}
+
+	querynessus.SavePluginsToFile("plugins.json", combinedPage)
 }
