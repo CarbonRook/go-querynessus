@@ -1,10 +1,30 @@
 package querynessus
 
+import (
+	"encoding/json"
+	"io/ioutil"
+	"log"
+)
+
 type PluginListPage struct {
 	Size       int                  `json:"size"`
 	TotalCount int                  `json:"total_count"`
 	Params     PluginListPageParams `json:"params"`
 	Data       PluginDetailsList    `json:"data"`
+}
+
+func (pluginsPage *PluginListPage) SaveToFile(filename string) error {
+	file, err := json.Marshal(pluginsPage)
+	if err != nil {
+		log.Println("Failed to marshal JSON structure")
+		return err
+	}
+	err = ioutil.WriteFile(filename, file, 0644)
+	if err != nil {
+		log.Printf("Failed to write to file %s", filename)
+		return err
+	}
+	return nil
 }
 
 type PluginListPageParams struct {
@@ -42,7 +62,7 @@ type PluginAttributes struct {
 	VPR                          VulnerabilityPriorityRating `json:"vpr"`
 	AlwaysRun                    bool                        `json:"always_run"`
 	Compliance                   bool                        `json:"compliance"`
-	BID                          []int                       `json:"bid"`
+	BugtraqID                    []int                       `json:"bid"`
 	STIGSeverity                 string                      `json:"stig_severity,omitempty"`
 	Agent                        string                      `json:"agent,omitempty"`
 	PotentialVulnerability       bool                        `json:"potential_vulnerability,omitempty"`

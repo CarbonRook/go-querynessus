@@ -32,5 +32,5 @@ func main() {
 		Size: len(results),
 	}
 
-	querynessus.SavePluginsToFile("plugins.json", combinedPage)
+	combinedPage.SaveToFile("plugins.json")
 }
