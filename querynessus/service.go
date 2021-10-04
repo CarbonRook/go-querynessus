@@ -2,21 +2,39 @@ package querynessus
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/go-querystring/query"
 )
 
 var TenablePluginsServiceEndpoint = "https://cloud.tenable.com/plugins/plugin"
+var TenableScannerGroupsEndpoint = "https://cloud.tenable.com/scanner-groups"
+var TenableScanEndpoint = "https://cloud.tenable.com/scans"
 var RequestInterval = 3 * time.Second
+
+type TenableApiClient struct {
+	Credentials TenableCredentials
+}
 
 type TenableCredentials struct {
 	AccessKey string
 	SecretKey string
+}
+
+func NewTenableApiClient(accessKey string, secretKey string) TenableApiClient {
+	return TenableApiClient{
+		Credentials: TenableCredentials{
+			AccessKey: accessKey,
+			SecretKey: secretKey,
+		},
+	}
 }
 
 type RequestParams struct {
@@ -25,43 +43,151 @@ type RequestParams struct {
 	Page        int32  `url:"page"`
 }
 
-func fetchSinglePluginPage(creds TenableCredentials, params *RequestParams) (PluginListPage, error) {
-
+func (tac TenableApiClient) sendPostRequest(tenableEndpoint string, params *RequestParams, payload string) (*http.Response, error) {
 	v, _ := query.Values(params)
 	tr := &http.Transport{}
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", TenablePluginsServiceEndpoint, nil)
-	req.URL.RawQuery = v.Encode()
+	req, err := http.NewRequest("POST", tenableEndpoint, strings.NewReader(payload))
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("X-ApiKeys", "accessKey="+creds.AccessKey+";secretKey="+creds.SecretKey)
+	req.Header.Add("X-ApiKeys", "accessKey="+tac.Credentials.AccessKey+";secretKey="+tac.Credentials.SecretKey)
+	req.URL.RawQuery = v.Encode()
 	if err != nil {
 		log.Fatalf("Failed to create request")
-		return PluginListPage{}, err
+		return nil, err
 	}
-
 	resp, err := client.Do(req)
-
 	if err != nil {
 		log.Fatalf("Failed to submit request")
-		return PluginListPage{}, err
+		return nil, err
 	}
 	if resp.StatusCode != 200 {
-		log.Printf("Received %s response from %s", resp.Status, TenablePluginsServiceEndpoint)
+		log.Printf("Received %s response from %s", resp.Status, tenableEndpoint)
 	}
 
+	return resp, nil
+}
+
+func (tac TenableApiClient) sendGetRequest(tenableEndpoint string, params *RequestParams) (*http.Response, error) {
+	v, _ := query.Values(params)
+	tr := &http.Transport{}
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest("GET", tenableEndpoint, nil)
+	req.URL.RawQuery = v.Encode()
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("X-ApiKeys", "accessKey="+tac.Credentials.AccessKey+";secretKey="+tac.Credentials.SecretKey)
+	if err != nil {
+		log.Fatalf("Failed to create request")
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("Failed to submit request")
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		log.Printf("Received %s response from %s", resp.Status, tenableEndpoint)
+	}
+
+	return resp, nil
+}
+
+func (tac TenableApiClient) ExportScanResults(params *RequestParams, scanId int) (fileId string, tempToken string, err error) {
+	endpoint := fmt.Sprintf("%s/%d/export", TenableScanEndpoint, scanId)
+	payload := "{\"format\": \"nessus\"}"
+	resp, err := tac.sendPostRequest(endpoint, params, payload)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", "", fmt.Errorf("received non 200 response %d", resp.StatusCode)
+	}
+
+	type ExportResponseBody struct {
+		FileId    string `json:"file"`
+		TempToken string `json:"temp_token"`
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	var respBody ExportResponseBody
+	err = decoder.Decode(&respBody)
+	if err != nil {
+		return "", "", err
+	}
+
+	return respBody.FileId, respBody.TempToken, nil
+}
+
+func (tac TenableApiClient) ScanResultExportStatus(scanId int, fileId string) (result bool, err error) {
+	endpoint := fmt.Sprintf("%s/%d/export/%s/status", TenableScanEndpoint, scanId, fileId)
+	resp, err := tac.sendGetRequest(endpoint, &RequestParams{})
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("received non 200 response %d", resp.StatusCode)
+	}
+
+	type StatusResponseBody struct {
+		Status string `json:"status"`
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	var respBody StatusResponseBody
+	err = decoder.Decode(&respBody)
+	if err != nil {
+		return false, err
+	}
+	return strings.ToLower(respBody.Status) == "ready", nil
+}
+
+func (tac TenableApiClient) DownloadExportedScan(scanId int, fileId string, outFile string) error {
+	out, err := os.Create(outFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	endpoint := fmt.Sprintf("%s/%d/export/%s/download", TenableScanEndpoint, scanId, fileId)
+	resp, err := tac.sendGetRequest(endpoint, &RequestParams{})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("received non 200 response %d", resp.StatusCode)
+	}
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (tac TenableApiClient) fetchSinglePluginPage(params *RequestParams) (*PluginListPage, error) {
+	resp, err := tac.sendGetRequest(TenablePluginsServiceEndpoint, params)
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	var pluginPage PluginListPage
 	err = decoder.Decode(&pluginPage)
 	if err != nil {
 		log.Fatalf("Failed to decode results")
-		return PluginListPage{}, err
+		return nil, err
 	}
-	return pluginPage, nil
+	return &pluginPage, nil
 }
 
-func FetchPlugins(creds TenableCredentials, params *RequestParams) ([]PluginDetails, error) {
-	pluginPage, err := fetchSinglePluginPage(creds, params)
+func (tac TenableApiClient) FetchPlugins(params *RequestParams) ([]PluginDetails, error) {
+	pluginPage, err := tac.fetchSinglePluginPage(params)
 	if err != nil {
 		log.Println("Failed to fetch plugin page")
 		return nil, err
@@ -69,12 +195,12 @@ func FetchPlugins(creds TenableCredentials, params *RequestParams) ([]PluginDeta
 	return pluginPage.Data.PluginDetails, err
 }
 
-func FetchAllPlugins(creds TenableCredentials, params *RequestParams) ([]PluginDetails, error) {
+func (tac TenableApiClient) FetchAllPlugins(params *RequestParams) ([]PluginDetails, error) {
 	var pluginDetails []PluginDetails
 	for {
 		log.Printf("Requesting plugin page %d", params.Page)
 		endIndex := params.Page * params.Size
-		pluginPage, err := fetchSinglePluginPage(creds, params)
+		pluginPage, err := tac.fetchSinglePluginPage(params)
 		if err != nil {
 			log.Printf("Failed to fetch plugin page %d", params.Page)
 			continue
