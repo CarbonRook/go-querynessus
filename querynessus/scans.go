@@ -1,18 +1,9 @@
 package querynessus
 
 type ScansPage struct {
-	Folders   []Folder `json:"folders"`
-	Scans     []Scan   `json:"scans"`
-	Timestamp int      `json:"timestamp"`
-}
-
-type Folder struct {
-	UnreadCount int    `json:"unread_count"`
-	Custom      int    `json:"custom"`
-	DefaultTag  int    `json:"default_tag"`
-	Type        string `json:"type"`
-	Name        string `json:"name"`
-	Id          int    `json:"id"`
+	FolderCollection
+	Scans     []Scan `json:"scans"`
+	Timestamp int    `json:"timestamp"`
 }
 
 type Scan struct {

@@ -25,6 +25,8 @@ func main() {
 	allPluginsFlag := flag.Bool("all-plugins", false, "Fetch all plugins")
 	singlePluginFlag := flag.Int("single-plugin", 0, "The plugin ID to fetch")
 	exportFlag := flag.Int("export-results", 0, "Export results from a given scan ID")
+	allScansFlag := flag.Bool("list-scans", false, "Export all scans")
+	allFoldersFlag := flag.Bool("list-folders", false, "List folders in your account")
 	flag.Parse()
 
 	tac := querynessus.NewTenableApiClient(os.Getenv(TENABLE_ACCESS_KEY), os.Getenv(TENABLE_SECRET_KEY))
@@ -77,7 +79,32 @@ func main() {
 		err = tac.DownloadExportedScan(*exportFlag, fileId, outFile)
 		if err != nil {
 			log.Fatalf("Failed to write to %s: %s\n", outFile, err)
+			return
 		}
 		log.Fatalf("Successfully downloaded %s\n", outFile)
+	} else if *allScansFlag {
+
+		params := querynessus.ScanParams{}
+		//log.Printf("Fetching folder \"%s\" (%d) contents", defaultFolder, folderId)
+		scanPage, err := tac.ListScans(&params)
+		if err != nil {
+			log.Fatal("Failed to get all scans")
+			return
+		}
+		outFile := "scans.json"
+		err = querynessus.SaveJsonToFile(outFile, scanPage)
+		if err != nil {
+			log.Fatalf("Failed to write scans page to file %s", outFile)
+			return
+		}
+	} else if *allFoldersFlag {
+		log.Printf("Fetching folder list")
+		folderCollection, err := tac.ListFolders()
+		if err != nil {
+			log.Fatal("Failed to fetch list of folders")
+		}
+		for _, folder := range folderCollection.Folders {
+			fmt.Printf("%s:%d\n", folder.Name, folder.Id)
+		}
 	}
 }
