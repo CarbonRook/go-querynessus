@@ -150,7 +150,12 @@ func main() {
 			Size: len(results),
 		}
 		log.Printf("Merging in %d new plugins\n", newPluginsPage.Size)
-		pluginPage.Merge(&newPluginsPage)
+		newCount, updatedCount, duplicateCount, err := pluginPage.Merge(&newPluginsPage)
+		if err != nil {
+			log.Fatalf("Failed to merge plugins: %s\n", err)
+			os.Exit(1)
+		}
+		log.Printf("Merged %d new plugins, updated %d existing plugins, ignored %d duplicate plugins", newCount, updatedCount, duplicateCount)
 		log.Printf("Saving new plugins to %s\n", *updateFileFlag)
 		err = jfpr.Save(pluginPage)
 		if err != nil {

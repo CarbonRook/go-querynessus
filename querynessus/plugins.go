@@ -14,21 +14,27 @@ type PluginListPage struct {
 	Data       PluginDetailsList    `json:"data"`
 }
 
-func (pluginsPage *PluginListPage) Merge(otherPluginsPage *PluginListPage) error {
+func (pluginsPage *PluginListPage) Merge(otherPluginsPage *PluginListPage) (newCount int, updatedCount int, duplicateCount int, err error) {
+	newCount = 0
+	updatedCount = 0
+	duplicateCount = 0
 	for _, otherPlugin := range otherPluginsPage.Data.PluginDetails {
 		plugin, idx, pluginExists := pluginsPage.Data.PluginFromId(otherPlugin.ID)
 		if pluginExists {
 			if plugin.Equal(&otherPlugin) {
+				duplicateCount += 1
 				continue
 			}
 			pluginsPage.Data.PluginDetails[idx] = otherPlugin
+			updatedCount += 1
 		} else {
 			pluginsPage.Data.PluginDetails = append(pluginsPage.Data.PluginDetails, otherPlugin)
 			pluginsPage.TotalCount += 1
 			pluginsPage.Size += 1
+			newCount += 1
 		}
 	}
-	return nil
+	return newCount, updatedCount, duplicateCount, nil
 }
 
 func (pluginsPage *PluginListPage) LatestModifiedDate() (time.Time, error) {
