@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"time"
 )
 
 type PluginListPage struct {
@@ -11,6 +12,37 @@ type PluginListPage struct {
 	TotalCount int                  `json:"total_count"`
 	Params     PluginListPageParams `json:"params"`
 	Data       PluginDetailsList    `json:"data"`
+}
+
+func (pluginsPage *PluginListPage) Merge(otherPluginsPage *PluginListPage) error {
+	for _, otherPlugin := range otherPluginsPage.Data.PluginDetails {
+		plugin, idx, pluginExists := pluginsPage.Data.PluginFromId(otherPlugin.ID)
+		if pluginExists {
+			if plugin.Equal(&otherPlugin) {
+				continue
+			}
+			pluginsPage.Data.PluginDetails[idx] = otherPlugin
+		} else {
+			pluginsPage.Data.PluginDetails = append(pluginsPage.Data.PluginDetails, otherPlugin)
+			pluginsPage.TotalCount += 1
+			pluginsPage.Size += 1
+		}
+	}
+	return nil
+}
+
+func (pluginsPage *PluginListPage) LatestModifiedDate() (time.Time, error) {
+	lastModifiedTime := time.Time{}
+	for _, tenablePlugin := range pluginsPage.Data.PluginDetails {
+		pluginLastModifiedTime, err := time.Parse(time.RFC3339, tenablePlugin.Attributes.PluginModificationDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		if lastModifiedTime.IsZero() || pluginLastModifiedTime.After(lastModifiedTime) {
+			lastModifiedTime = pluginLastModifiedTime
+		}
+	}
+	return lastModifiedTime, nil
 }
 
 func (pluginsPage *PluginListPage) SaveToFile(filename string) error {
@@ -37,10 +69,29 @@ type PluginDetailsList struct {
 	PluginDetails []PluginDetails `json:"plugin_details"`
 }
 
+func (pdl PluginDetailsList) PluginFromId(id int) (*PluginDetails, int, bool) {
+	for i, pluginDetail := range pdl.PluginDetails {
+		if pluginDetail.ID == id {
+			return &pluginDetail, i, true
+		}
+	}
+	return &PluginDetails{}, -1, false
+}
+
 type PluginDetails struct {
 	ID         int              `json:"id"`
 	Name       string           `json:"name"`
 	Attributes PluginAttributes `json:"attributes"`
+}
+
+func (pd *PluginDetails) IsZero() bool {
+	return pd == &PluginDetails{}
+}
+
+func (pluginDetails PluginDetails) Equal(otherPluginDetails *PluginDetails) bool {
+	return pluginDetails.ID == otherPluginDetails.ID &&
+		pluginDetails.Attributes.PluginPublicationDate == otherPluginDetails.Attributes.PluginPublicationDate &&
+		pluginDetails.Attributes.PluginModificationDate == otherPluginDetails.Attributes.PluginModificationDate
 }
 
 type PluginAttributes struct {

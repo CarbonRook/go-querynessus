@@ -14,12 +14,6 @@ import (
 	"github.com/google/go-querystring/query"
 )
 
-var TenablePluginsServiceEndpoint = "https://cloud.tenable.com/plugins/plugin"
-var TenableScannerGroupsEndpoint = "https://cloud.tenable.com/scanner-groups"
-var TenableScanEndpoint = "https://cloud.tenable.com/scans"
-var TenableFoldersEndpoint = "https://cloud.tenable.com/folders"
-var RequestInterval = 3 * time.Second
-
 type TenableApiClient struct {
 	Credentials TenableCredentials
 }
