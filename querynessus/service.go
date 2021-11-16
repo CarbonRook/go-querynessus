@@ -52,6 +52,8 @@ func (tac TenableApiClient) sendPostRequest(tenableEndpoint string, params Tenab
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("X-ApiKeys", "accessKey="+tac.Credentials.AccessKey+";secretKey="+tac.Credentials.SecretKey)
 	req.URL.RawQuery = v.Encode()
+	log.Printf("Query: %s", req.URL)
+	log.Printf("Body: %s", payload)
 	if err != nil {
 		log.Fatalf("Failed to create request")
 		return nil, err
@@ -63,7 +65,7 @@ func (tac TenableApiClient) sendPostRequest(tenableEndpoint string, params Tenab
 	}
 	if resp.StatusCode != 200 {
 		log.Printf("Received %s response from %s", resp.Status, tenableEndpoint)
-		return nil, err
+		return nil, fmt.Errorf("received %s response from %s", resp.Status, tenableEndpoint)
 	}
 
 	return resp, nil
@@ -89,18 +91,32 @@ func (tac TenableApiClient) sendGetRequest(tenableEndpoint string, params Tenabl
 	}
 	if resp.StatusCode != 200 {
 		log.Printf("Received %s response from %s", resp.Status, tenableEndpoint)
-		return nil, err
+		return nil, fmt.Errorf("received %s response from %s", resp.Status, tenableEndpoint)
 	}
 
 	return resp, nil
 }
 
-func (tac TenableApiClient) ExportScanResults(params *RequestParams, scanId int) (fileId string, tempToken string, err error) {
+type ExportScanParams struct {
+	HistoryID   string `url:"history_id,omitempty"`
+	HistoryUUID string `url:"history_uuid,omitempty"`
+}
+
+type ExportScanPayload struct {
+	Format   string `json:"format"`
+	Password string `json:"password,omitempty"`
+	AssetID  int    `json:"asset_id,omitempty"`
+}
+
+func (tac TenableApiClient) ExportScanResults(params *ExportScanParams, scanId int, payload *ExportScanPayload) (fileId string, tempToken string, err error) {
 	endpoint := fmt.Sprintf("%s/%d/export", TenableScanEndpoint, scanId)
-	payload := "{\"format\": \"nessus\"}"
-	resp, err := tac.sendPostRequest(endpoint, params, payload)
+	jsonPayload, err := json.Marshal(payload)
+	resp, err := tac.sendPostRequest(endpoint, params, string(jsonPayload))
 	if err != nil {
 		return "", "", err
+	}
+	if resp == nil {
+		return "", "", fmt.Errorf("empty response received")
 	}
 	defer resp.Body.Close()
 
@@ -128,6 +144,9 @@ func (tac TenableApiClient) ScanResultExportStatus(scanId int, fileId string) (r
 	resp, err := tac.sendGetRequest(endpoint, &RequestParams{})
 	if err != nil {
 		return false, err
+	}
+	if resp == nil {
+		return false, fmt.Errorf("empty response received")
 	}
 	defer resp.Body.Close()
 
@@ -179,6 +198,9 @@ func (tac TenableApiClient) fetchSinglePluginPage(params *RequestParams) (*Plugi
 	if err != nil {
 		return nil, err
 	}
+	if resp == nil {
+		return nil, fmt.Errorf("empty response received")
+	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	var pluginPage PluginListPage
@@ -220,10 +242,32 @@ func (tac TenableApiClient) FetchAllPlugins(params *RequestParams) ([]PluginDeta
 	return pluginDetails, nil
 }
 
+func (tac TenableApiClient) FetchSinglePluginDetails(pluginId int) (PluginDetails, error) {
+	resp, err := tac.sendGetRequest(fmt.Sprintf("%s/%d", TenablePluginsServiceEndpoint, pluginId), &RequestParams{})
+	if err != nil {
+		return PluginDetails{}, err
+	}
+	if resp == nil {
+		return PluginDetails{}, fmt.Errorf("empty response received")
+	}
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	var pluginDetails PluginDetails
+	err = decoder.Decode(&pluginDetails)
+	if err != nil {
+		log.Fatalf("Failed to decode results for plugin %d: %s\n", pluginId, err)
+		return PluginDetails{}, err
+	}
+	return pluginDetails, nil
+}
+
 func (tac TenableApiClient) ListFolders() (*FolderCollection, error) {
 	resp, err := tac.sendGetRequest(TenableFoldersEndpoint, &RequestParams{})
 	if err != nil {
 		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("empty response received")
 	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
@@ -246,6 +290,9 @@ func (tac TenableApiClient) ListScans(params *ScanParams) (*ScansPage, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp == nil {
+		return nil, fmt.Errorf("empty response received")
+	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	var allScans ScansPage
@@ -255,6 +302,25 @@ func (tac TenableApiClient) ListScans(params *ScanParams) (*ScansPage, error) {
 		return nil, fmt.Errorf("failed to decode scan page: %s", err)
 	}
 	return &allScans, nil
+}
+
+func (tac TenableApiClient) FetchScanDetails(scanId int) (*ScanDetails, error) {
+	resp, err := tac.sendGetRequest(fmt.Sprintf("%s/%d", TenableScanEndpoint, scanId), &RequestParams{})
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("empty response received")
+	}
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	var scanDetails ScanDetails
+	err = decoder.Decode(&scanDetails)
+	if err != nil {
+		log.Fatalf("Failed to decode results for plugin %d: %s\n", scanId, err)
+		return nil, err
+	}
+	return &scanDetails, nil
 }
 
 func LoadPluginsFromFile(filename string) (PluginListPage, error) {

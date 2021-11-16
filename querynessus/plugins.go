@@ -88,6 +88,7 @@ type PluginDetails struct {
 	ID         int              `json:"id"`
 	Name       string           `json:"name"`
 	Attributes PluginAttributes `json:"attributes"`
+	FamilyName string           `json:"family_name,omitempty"`
 }
 
 func (pd *PluginDetails) IsZero() bool {
