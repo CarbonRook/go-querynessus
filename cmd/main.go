@@ -53,6 +53,9 @@ func main() {
 	allScansFlag := flag.Bool("list-scans", false, "Export all scans")
 	scansSinceFlag := flag.String("scans-since", "", "Fetch all scans since a given date, YYYY-MM-DD")
 	singleScanFlag := flag.Int("scan", 0, "Fetch single scan details")
+	// Scan Filters
+	//customerFlag := flag.String("customer", "", "Customer name to filter scans for")
+	//scanTypeFlag := flag.String("scan-type", "", "Type of scan to filter on")
 	// Folders
 	allFoldersFlag := flag.Bool("list-folders", false, "List folders in your account")
 	// Update existing JSON database
