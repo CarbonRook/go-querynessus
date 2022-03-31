@@ -1,4 +1,4 @@
-module github.com/carbonrook/go-querynessus
+module github.com/CarbonRook/go-querynessus
 
 go 1.17
 

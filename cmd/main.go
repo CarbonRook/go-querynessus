@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/carbonrook/go-querynessus/querynessus"
+	"github.com/CarbonRook/go-querynessus/querynessus"
 )
 
 var TENABLE_ACCESS_KEY = "TENABLE_ACCESS_KEY"
